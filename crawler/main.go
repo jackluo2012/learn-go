@@ -19,7 +19,7 @@ func main() {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		fmt.Printf("Error: status code	", response.StatusCode)
+		fmt.Println("Error: status code	", response.StatusCode)
 	}
 	//将网页的 gbk 编号 换成 utf-8编码
 	//utf8Reader := transform.NewReader(response.Body,simplifiedchinese.GBK.NewDecoder())
