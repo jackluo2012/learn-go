@@ -12,7 +12,6 @@ func ParseCity(cotent []byte) engine.ParseResult {
 	matches := re.FindAllSubmatch(cotent, -1)
 
 	result := engine.ParseResult{}
-	limit := 10
 	for _, match := range matches {
 		name := string(match[2])
 		result.Items = append(result.Items, "User "+name)
@@ -22,10 +21,6 @@ func ParseCity(cotent []byte) engine.ParseResult {
 				return ParseProfile(c, name)
 			},
 		})
-		limit--
-		if limit == 0 {
-			break
-		}
 	}
 	return result
 }

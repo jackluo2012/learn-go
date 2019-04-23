@@ -10,10 +10,15 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 )
 
-func Fetch(url string) ([]byte, error) {
+//新建一个rateLimiter 防止请求过快被封
 
+var rateLimiter = time.Tick(time.Millisecond * 100)
+
+func Fetch(url string) ([]byte, error) {
+	<-rateLimiter
 	log.Printf("Fetching url:%s", url)
 
 	client := &http.Client{}
