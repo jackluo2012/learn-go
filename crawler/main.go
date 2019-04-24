@@ -2,13 +2,13 @@ package main
 
 import (
 	"gopcp.v2/chapter7/crawler/engine"
-	"gopcp.v2/chapter7/crawler/scheduler"
 	"gopcp.v2/chapter7/crawler/zhenai/parser"
 )
 
 func main() {
 	e := engine.ConcurrentEngine{
-		Scheduler: &scheduler.SimpleScheduler{},
+		//Scheduler: &scheduler.SimpleScheduler{},//并发版的
+		//Scheduler: &scheduler.QueuedScheduler{},//队列版的
 		WorkerCount:10,
 	}
 

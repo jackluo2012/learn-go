@@ -7,8 +7,15 @@ type SimpleScheduler struct {
 }
 
 //设置初始化的 workerchan
-func (s *SimpleScheduler) ConfigureMasterWorkerChan(c chan engine.Request) {
-	s.workerChan = c //初始化通知
+func (s *SimpleScheduler) WorkerReady(c chan engine.Request)  {
+
+}
+func (s *SimpleScheduler) WorkerChan() chan engine.Request {
+	return s.workerChan
+}
+
+func (s *SimpleScheduler) Run() {
+	s.workerChan = make(chan engine.Request)
 }
 
 // 设置往 workerChan 写的 reques
