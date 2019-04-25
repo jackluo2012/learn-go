@@ -1,13 +1,11 @@
 package engine
 
-import (
-	"log"
-)
-
 //先声明一个爬虫引擎
 type ConcurrentEngine struct {
 	Scheduler   Scheduler // 定义调度器
 	WorkerCount int       //定义处理 worker 的个数
+
+	ItemChan chan Item
 }
 
 //定义一个接口
@@ -34,19 +32,24 @@ func (c *ConcurrentEngine) Run(seeds ...Request) {
 	}
 	//将请求不停的往 Submit 里面放
 	for _, r := range seeds {
+
 		c.Scheduler.Submit(r)
+
 	}
-	itemCount := 0
 	for {
 		//接收 parser
 		result := <-out
 		for _, item := range result.Items {
-			log.Printf("Got item $%d: %v", itemCount, item)
-			itemCount++
+			// 加入存储队列
+			go func() {
+				c.ItemChan <- item
+			}()
 		}
 		//再将拿到的 Request 再给调度器
 		for _, r := range result.Request {
-			c.Scheduler.Submit(r)
+			if !isDuplicate(r.Url) {
+				c.Scheduler.Submit(r)
+			}
 		}
 	}
 }
@@ -68,4 +71,16 @@ func createWorker(in chan Request, out chan ParseResult, ready ReadyNotifier) {
 			out <- result
 		}
 	}()
+}
+
+//防止重复
+var visiteUrls = make(map[string]bool)
+
+func isDuplicate(url string) bool {
+	if visiteUrls[url] {
+		return true
+	}
+	visiteUrls[url] = true
+	return false
+
 }
