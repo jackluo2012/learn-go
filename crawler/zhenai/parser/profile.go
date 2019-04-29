@@ -21,15 +21,12 @@ func ParseProfile(content []byte, url string) engine.ParseResult {
 	result := engine.ParseResult{}
 	//*
 	for _, match := range matches {
-		//log.Printf("值:%s", matches[1])
-		log.Printf("match 值:%s", match[1])
-
 		p := model.Profile{}
 		err := json.Unmarshal(match[1], &p)
 		if err != nil {
 			log.Printf("parse Error:%s", err.Error())
 		}
-		log.Printf("match 值:%v", p)
+		//log.Printf("match 值:%v", p)
 		result.Items = append(result.Items, engine.Item{
 			Url:     url,
 			Type:    "zhenai",
@@ -42,8 +39,8 @@ func ParseProfile(content []byte, url string) engine.ParseResult {
 	for _, match := range matches {
 		for _, url := range match {
 			result.Request = append(result.Request, engine.Request{
-				Url:        string(url),
-				ParserFunc: ProfileParse(),
+				Url:    string(url),
+				Parser: NewProfileParse(""),
 			})
 		}
 
@@ -51,9 +48,21 @@ func ParseProfile(content []byte, url string) engine.ParseResult {
 
 	return result
 }
-func ProfileParse() engine.ParserFunc {
-	return func(c []byte,url string) engine.ParseResult {
-		return ParseProfile(c, url)
-	}
 
+type ProfileParse struct {
+	userName string
+}
+
+func NewProfileParse(name string) *ProfileParse {
+	return &ProfileParse{
+		userName: name,
+	}
+}
+
+func (p *ProfileParse) Parse(contents []byte, url string) engine.ParseResult {
+	return ParseProfile(contents, url)
+}
+
+func (p *ProfileParse) Serialize() (name string, args interface{}) {
+	return "ParseProfile", p.userName
 }

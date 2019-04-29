@@ -35,7 +35,7 @@ func TestSave(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err := save(client, index, expected); err != nil {
+	if err := Save(client, index, expected); err != nil {
 		t.Error(err)
 	}
 

@@ -15,11 +15,12 @@ func main() {
 	}
 	e := engine.ConcurrentEngine{
 		//Scheduler: &scheduler.SimpleScheduler{},//并发版的
-		Scheduler:   &scheduler.QueuedScheduler{}, //队列版的
-		WorkerCount: 10,
-		ItemChan:    itemServer,
+		Scheduler:        &scheduler.QueuedScheduler{}, //队列版的
+		WorkerCount:      10,
+		ItemChan:         itemServer,
+		RequestProcessor: engine.Worker,
 	}
 
 	//e.Run(engine.Request{Url: "http://www.zhenai.com/zhenghun", ParserFunc: parser.ParseCityList})
-	e.Run(engine.Request{Url: "http://www.zhenai.com/zhenghun/shanghai", ParserFunc: parser.ParseCity})
+	e.Run(engine.Request{Url: "http://www.zhenai.com/zhenghun/shanghai", Parser: engine.NewFuncParser(parser.ParseCity, "ParseCity")})
 }

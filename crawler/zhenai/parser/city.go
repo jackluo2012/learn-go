@@ -2,6 +2,7 @@ package parser
 
 import (
 	"gopcp.v2/chapter7/crawler/engine"
+	"gopcp.v2/chapter7/crawler_distributed/config"
 	"regexp"
 )
 
@@ -14,22 +15,21 @@ func ParseCity(content []byte, _ string) engine.ParseResult {
 	for _, match := range matches {
 		url := string(match[1])
 		result.Request = append(result.Request, engine.Request{
-			Url:        url,
-			ParserFunc: ParseProfile,
+			Url:    url,
+			Parser: NewProfileParse(""),
 		})
 	}
-
+	//*
 	matches = cityUrlRe.FindAllSubmatch(content, -1)
 	for _, match := range matches {
 		for _, url := range match {
 			result.Request = append(result.Request, engine.Request{
-				Url: string(url),
-				ParserFunc: func(bytes []byte, s string) engine.ParseResult {
-					return ParseCity(bytes, "")
-				},
+				Url:    string(url),
+				Parser: engine.NewFuncParser(ParseCity, config.ParseCity),
 			})
 		}
 
 	}
+	//*/
 	return result
 }

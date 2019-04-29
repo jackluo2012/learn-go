@@ -7,6 +7,7 @@ import (
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
+	"gopcp.v2/chapter7/crawler_distributed/config"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,10 +16,10 @@ import (
 
 //新建一个rateLimiter 防止请求过快被封
 
-var rateLimiter = time.Tick(time.Millisecond * 100)
+var rateLimiter = time.Tick(time.Second / config.Qps)
 
 func Fetch(url string) ([]byte, error) {
-	//<-rateLimiter
+	<-rateLimiter
 	log.Printf("Fetching url:%s", url)
 
 	client := &http.Client{}
@@ -60,7 +61,7 @@ func determineEncoding(r *bufio.Reader) encoding.Encoding {
 	//默认只读1024个字节,读了以后就不能再读
 	bytes, err := r.Peek(1024)
 	if err != nil {
-		log.Printf("Fetcher error: %v", err)
+		//log.Printf("Fetcher error: %v", err)
 		return unicode.UTF8
 	}
 

@@ -18,7 +18,7 @@ func (e *SimpleEngine) Run(seeds ...Request) {
 		r := requests[0]
 		requests = requests[1:]
 		//改成封装好的
-		parseResult, err := worker(r)
+		parseResult, err := Worker(r)
 		if err != nil {
 			//如果 报错,就直接处理下个一个 url
 			log.Printf("Fetcher: error fetching Url Err %s: %v", r.Url, err)

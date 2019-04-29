@@ -36,7 +36,7 @@ func TestParseCityList(t *testing.T) {
 	}
 
 	for i, item := range expectedItems {
-		if item != result.Items[i] {
+		if item != result.Items[i].Payload {
 			t.Errorf("expected url is %s,bad url is %s", item, result.Items[i])
 		}
 	}

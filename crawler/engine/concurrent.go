@@ -6,7 +6,11 @@ type ConcurrentEngine struct {
 	WorkerCount int       //定义处理 worker 的个数
 
 	ItemChan chan Item
+
+	RequestProcessor Processor
 }
+
+type Processor func(Request) (ParseResult, error)
 
 //定义一个接口
 type Scheduler interface {
@@ -28,7 +32,7 @@ func (c *ConcurrentEngine) Run(seeds ...Request) {
 	c.Scheduler.Run()
 	//获取 一次生成配置的 个数
 	for i := 0; i < c.WorkerCount; i++ {
-		createWorker(c.Scheduler.WorkerChan(), out, c.Scheduler)
+		c.createWorker(c.Scheduler.WorkerChan(), out, c.Scheduler)
 	}
 	//将请求不停的往 Submit 里面放
 	for _, r := range seeds {
@@ -54,7 +58,7 @@ func (c *ConcurrentEngine) Run(seeds ...Request) {
 	}
 }
 
-func createWorker(in chan Request, out chan ParseResult, ready ReadyNotifier) {
+func (e *ConcurrentEngine) createWorker(in chan Request, out chan ParseResult, ready ReadyNotifier) {
 	//单独开个 worker 来创建
 	go func() {
 		for {
@@ -63,7 +67,7 @@ func createWorker(in chan Request, out chan ParseResult, ready ReadyNotifier) {
 			//不停的接收 Request 的请求
 			request := <-in
 			//接到了就往 worker 里面放
-			result, err := worker(request)
+			result, err := e.RequestProcessor(request) //Worker(request) //call rpc
 			if err != nil {
 				continue
 			}

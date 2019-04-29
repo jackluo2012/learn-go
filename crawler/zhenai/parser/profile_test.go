@@ -26,7 +26,7 @@ func TestParseProfile(t *testing.T) {
 	}
 	//fmt.Printf("%s", content)
 	result := ParseProfile(content, name)
-	p2 := result.Items[0].(model.Profile)
+	p2 := result.Items[0].Payload.(model.Profile)
 	if p.Name != p2.Name || p.Genter != p2.Genter || p.Marriage != p2.Marriage {
 		t.Errorf("查找失败 ")
 	}
