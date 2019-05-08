@@ -6,18 +6,20 @@ import (
 )
 
 //二次随机法
-func DoubleRandom(count, amount int64) int64 {
+func DoubleAverage(count, amount int64) int64 {
 
 	if count == 1 {
 		return amount
 	}
 
-	//计算最大可调度金额
+	//计算最大可用金额
 	max := amount - min*count
-	//一次随机,计算出一个种子作为基数
+	//计算出最大平均值
+
+	avg := max/count + min
+	//二倍均值,基础上加上最小金额,防止了现零值
+	avg2 := 2*avg + min
+	//随机红包金额序列元素,把二倍均值作为随机的最大数
 	rand.Seed(time.Now().UnixNano())
-	seed := rand.Int63n(count*2) + 1
-	n := max/seed + min
-	//二次随机,计算出红包金额序列元素
-	return rand.Int63n(n) + min
+	return rand.Int63n(avg2) + min
 }

@@ -3,18 +3,20 @@ package main
 import (
 	"fmt"
 	"log"
-	"bytes"
-	"time"
 	"github.com/streadway/amqp"
 )
 
 const (
 	//AMQP URI
 	uri           =  "amqp://guest:guest@localhost:5672/"
-	//Durable AMQP exchange nam
-	exchangeName  = ""
+	//Durable AMQP exchange name
+	exchangeName =  "test-idoall-exchange-logs"
+	//Exchange type - direct|fanout|topic|x-custom
+	exchangeType = "fanout"
+	//AMQP binding key
+	bindingKey   = ""
 	//Durable AMQP queue name
-	queueName     = "test-idoall-queues-durability"
+	queueName     = ""
 )
 
 //如果存在错误，则输出
@@ -27,15 +29,17 @@ func failOnError(err error, msg string) {
 
 func main(){
 	//调用消息接收者
-	consumer(uri, exchangeName, queueName)
+	consumer(uri, exchangeName, exchangeType, queueName, bindingKey)
 }
 
 //接收者方法
 //
 //@amqpURI, amqp的地址
 //@exchange, exchange的名称
+//@exchangeType, exchangeType的类型direct|fanout|topic
 //@queue, queue的名称
-func consumer(amqpURI string, exchange string, queue string){
+//@key , 绑定的key名称
+func consumer(amqpURI string, exchange string, exchangeType string, queue string, key string){
 	//建立连接
 	log.Printf("dialing %q", amqpURI)
 	connection, err := amqp.Dial(amqpURI)
@@ -48,18 +52,39 @@ func consumer(amqpURI string, exchange string, queue string){
 	failOnError(err, "Failed to open a channel")
 	defer channel.Close()
 
-	log.Printf("got queue, declaring %q", queue)
+	//创建一个exchange
+	log.Printf("got Channel, declaring Exchange (%q)", exchange)
+	err = channel.ExchangeDeclare(
+		exchange,     // name of the exchange
+		exchangeType, // type
+		true,         // durable
+		false,        // delete when complete
+		false,        // internal
+		false,        // noWait
+		nil,          // arguments
+	);
+	failOnError(err, "Exchange Declare:")
 
 	//创建一个queue
 	q, err := channel.QueueDeclare(
 		queueName, // name
-		true,   // durable
+		false,   // durable
 		false,   // delete when unused
-		false,   // exclusive
+		true,   // exclusive 当Consumer关闭连接时，这个queue要被deleted
 		false,   // no-wait
 		nil,     // arguments
 	)
 	failOnError(err, "Failed to declare a queue")
+
+	//绑定到exchange
+	err = channel.QueueBind(
+		q.Name, // name of the queue
+		key,        // bindingKey
+		exchange,   // sourceExchange
+		false,      // noWait
+		nil,        // arguments
+	);
+	failOnError(err, "Failed to bind a queue")
 
 	log.Printf("Queue bound to Exchange, starting Consume")
 	//订阅消息
@@ -80,12 +105,7 @@ func consumer(amqpURI string, exchange string, queue string){
 	//调用gorountine
 	go func() {
 		for d := range msgs {
-			log.Printf("Received a message: %s", d.Body)
-			dot_count := bytes.Count(d.Body, []byte("."))
-			t := time.Duration(dot_count)
-			time.Sleep(t * time.Second)
-			log.Printf("Done")
-			d.Ack(false)
+			log.Printf(" [x] %s", d.Body)
 		}
 	}()
 
