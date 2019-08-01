@@ -23,3 +23,10 @@ func IntToHex(i int64) []byte {
 	}
 	return buff.Bytes()
 }
+
+//反向字节阵列
+func ReverseBytes(data []byte) {
+	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
+		data[i],data[j] = data[j],data[i]
+	}
+}

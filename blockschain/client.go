@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 )
 
 // 新建一个 Blockchain 客户端操作
@@ -18,6 +17,9 @@ func (cli *CLI) Run() {
 	//创建子命令
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
 	createBlockchainCmd := flag.NewFlagSet("createblockchain", flag.ExitOnError)
+	createWalletCmd := flag.NewFlagSet("createWallet", flag.ExitOnError)
+	listAddressesCmd := flag.NewFlagSet("listaddresses", flag.ExitOnError)
+
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 
@@ -38,6 +40,10 @@ func (cli *CLI) Run() {
 		if err != nil {
 			log.Panic(err)
 		}
+	case "createWallet":
+		cli.createWallet()
+	case "listaddresses":
+		cli.listAddresses()
 	case "printchain":
 		err := printChainCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -69,6 +75,14 @@ func (cli *CLI) Run() {
 		cli.createBlockchain(*createBlockchainAddress)
 	}
 
+	if createWalletCmd.Parsed() {
+		cli.createWallet()
+	}
+
+	if listAddressesCmd.Parsed() {
+		cli.listAddresses()
+	}
+
 	if printChainCmd.Parsed() {
 		cli.printChain()
 	}
@@ -81,57 +95,6 @@ func (cli *CLI) Run() {
 
 		cli.send(*sendFrom, *sendTo, *sendAmount)
 	}
-}
-
-func (cli *CLI) getBalance(address string) {
-	bc := NewBlockchain(address)
-	defer bc.Db.Close()
-
-	balance := 0
-	UTXOs := bc.FindUTXO(address)
-
-	for _, out := range UTXOs {
-		balance += out.Value
-	}
-
-	fmt.Printf("Balance of '%s': %d\n", address, balance)
-}
-
-func (cli *CLI) send(from, to string, amount int) {
-	bc := NewBlockchain(from)
-	defer bc.Db.Close()
-
-	//生成交易
-	tx := NewUTXOTransaction(from, to, amount, bc)
-	//进挖矿产生区块
-	bc.MineBlock([]*Transaction{tx})
-	fmt.Println("Success!")
-}
-
-func (cli *CLI) printChain() {
-	bc := NewBlockchain("")
-	defer bc.Db.Close()
-	bci := bc.Iterator()
-	for {
-		block := bci.Next()
-		fmt.Printf("Prev. hash: %x\n", block.PreBlockHash)
-		fmt.Printf("Hash. hash: %x\n", block.Hash)
-		pow := NewProofOfWork(block)
-		fmt.Printf("POW: %s\n", strconv.FormatBool(pow.Validate()))
-		fmt.Println()
-		if len(block.PreBlockHash) == 0 {
-			break
-		}
-	}
-}
-
-/**
- * 创建一个连接
- */
-func (cli *CLI) createBlockchain(address string) {
-	bc := CreateBlockchain(address)
-	bc.Db.Close()
-	fmt.Println("Done!")
 }
 
 /**

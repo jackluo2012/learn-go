@@ -1,7 +1,10 @@
 package blockschain
 
 import (
+	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/boltdb/bolt"
 	"log"
@@ -24,6 +27,12 @@ type BlockchainItertor struct {
 // 使用提供的事务挖掘新块
 func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
+
+	for _, tx := range transactions {
+		if bc.VerifyTransaction(tx) != true {
+			log.Panic("ERROR: Invalid transaction")
+		}
+	}
 
 	err := bc.Db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BlocksBucket))
@@ -49,11 +58,16 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 		if err != nil {
 			log.Panic(err)
 		}
+
 		//设置最新hash 链为 tip
 		bc.Tip = newBlock.Hash
 
 		return nil
 	})
+	if err != nil {
+		log.Panic(err)
+	}
+
 }
 
 /**
@@ -68,14 +82,15 @@ func (bc *Blockchain) Iterator() *BlockchainItertor {
 }
 
 // FindUTXO finds and returns all unspent transaction outputs
-func (bc *Blockchain) FindUTXO(address string) []TXOutput {
+func (bc *Blockchain) FindUTXO(pubKeyHash []byte) []TXOutput {
 	var UTXOs []TXOutput
 	//获取 未被交易的 utxo
-	unspentTransactions := bc.FindUnspentTransactions(address)
+	unspentTransactions := bc.FindUnspentTransactions(pubKeyHash)
+
 	//未返回的
 	for _, tx := range unspentTransactions {
 		for _, out := range tx.Vout {
-			if out.CanBeUnlockedWith(address) {
+			if out.IsLockedWithKey(pubKeyHash) {
 				UTXOs = append(UTXOs, out)
 			}
 		}
@@ -83,13 +98,14 @@ func (bc *Blockchain) FindUTXO(address string) []TXOutput {
 
 	return UTXOs
 }
+
 /**
  *  查找未被消费的交易区块和金额
  */
-func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
+func (bc *Blockchain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int, map[string][]int) {
 	unspentOutputs := make(map[string][]int)
 	//获取款被使用的金额
-	unspentTXs := bc.FindUnspentTransactions(address)
+	unspentTXs := bc.FindUnspentTransactions(pubKeyHash)
 	accumulated := 0
 
 Work:
@@ -97,7 +113,7 @@ Work:
 		txID := hex.EncodeToString(tx.ID)
 		//遍历所有的交易记录
 		for outIdx, out := range tx.Vout {
-			if out.CanBeUnlockedWith(address) && accumulated < amount {
+			if out.IsLockedWithKey(pubKeyHash) && accumulated < amount {
 				accumulated += out.Value
 				unspentOutputs[txID] = append(unspentOutputs[txID], outIdx)
 
@@ -111,17 +127,19 @@ Work:
 	return accumulated, unspentOutputs
 
 }
+
 /**
  * 查找 未消费 TXO(UTXO)
  * 未消费表式TXO 未被任何的 TXI 所引用
  */
-func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
+func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 
 	var unspentTXs []Transaction
 
 	spentTXOs := make(map[string][]int)
 	// 返回 blockchain 封装 接口
 	bci := bc.Iterator()
+
 	//查找
 	for {
 		// 交易存在 block 中,我们要遍历blockchain 中的每个 block
@@ -143,8 +161,9 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 						}
 					}
 				}
+
 				//返回未交易的 UTXO
-				if out.CanBeUnlockedWith(address) {
+				if out.IsLockedWithKey(pubKeyHash) {
 					unspentTXs = append(unspentTXs, *tx)
 				}
 			}
@@ -153,7 +172,7 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 				//遍历交易的所有输出
 				for _, in := range tx.Vin {
 					//验证交易是否正确
-					if in.CanUnlockOutputWith(address) {
+					if in.UsesKey(pubKeyHash) {
 						//获取 输入的id 并转换成字符串
 						inTxID := hex.EncodeToString(in.Txid)
 						//将 UTXI 的 UTXO 加入
@@ -162,13 +181,63 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 				}
 			}
 		}
+
 		//查找到头结点
 		if len(block.PreBlockHash) == 0 {
 			break
 		}
 	}
+
 	//返回未交易的 UTXO
 	return unspentTXs
+}
+
+func (bc *Blockchain) SignTransaction(tx *Transaction, privkey ecdsa.PrivateKey) {
+	prevTXs := make(map[string]Transaction)
+
+	for _, vin := range tx.Vin {
+		prevTX, err := bc.FindTransaction(vin.Txid)
+		if err != nil {
+			log.Panic(err)
+		}
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+
+	tx.Sign(privkey, prevTXs)
+}
+
+func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
+	bci := bc.Iterator()
+
+	for {
+		block := bci.Next()
+
+		for _, tx := range block.Transactions {
+			if bytes.Compare(tx.ID, ID) == 0 {
+				return *tx, nil
+			}
+		}
+
+		if len(block.PreBlockHash) == 0 {
+			break
+		}
+	}
+
+	return Transaction{}, errors.New("Transaction is not found")
+}
+
+func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
+	prevTXs := make(map[string]Transaction)
+
+	for _, vin := range tx.Vin {
+		prevTX, err := bc.FindTransaction(vin.Txid)
+		if err != nil {
+			log.Panic(err)
+		}
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+
+	return tx.Verify(prevTXs)
 }
 
 /**
@@ -215,12 +284,14 @@ func NewBlockchain(address string) *Blockchain {
 		//获取 最新 区块的地址
 		b := tx.Bucket([]byte(BlocksBucket))
 		tip = b.Get([]byte("l"))
+
 		return nil
 	})
 
 	if err != nil {
 		log.Panic(err)
 	}
+
 	bc := Blockchain{tip, db}
 
 	return &bc
@@ -233,6 +304,7 @@ func dbExists() bool {
 	}
 	return true
 }
+
 /**
  * 创建一个  区块链 数据库
  */
@@ -241,36 +313,47 @@ func CreateBlockchain(address string) *Blockchain {
 		fmt.Println("Blockchain already exists.")
 		os.Exit(1)
 	}
+
 	var tip []byte
+
+	cbtx := NewCoinbaseTX(address, GenesisCoinbaseData)
+	//创建创世区块
+	genesis := NewGenesisBlock(cbtx)
+
 	db, err := bolt.Open(DbFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
+
 	err = db.Update(func(tx *bolt.Tx) error {
-		cbtx := NewCoinbaseTX(address, GenesisCoinbaseData)
-		//创建创世区块
-		genesis := NewGenesisBlock(cbtx)
+
 		//创建一个表
 		b, err := tx.CreateBucket([]byte(BlocksBucket))
 		if err != nil {
 			log.Panic(err)
 		}
+
 		//将写第一个区块写进去
 		err = b.Put(genesis.Hash, genesis.Serialize())
 		if err != nil {
 			log.Panic(err)
 		}
+
 		//将 hash 存入最新的区块
 		err = b.Put([]byte("l"), genesis.Hash)
 		if err != nil {
 			log.Panic(err)
 		}
 		tip = genesis.Hash
+
 		return nil
 	})
+
 	if err != nil {
 		log.Panic(err)
 	}
+
 	bc := Blockchain{Tip: tip, Db: db}
+
 	return &bc
 }
