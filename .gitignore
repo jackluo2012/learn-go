@@ -1,2 +1,4 @@
 ./blockchain/blockchian.db
 ./blocks_chain_test/blockchian.db
+./blocks_chain_test/blockchians.db
+./blocks_chain_test/wallet.dat
