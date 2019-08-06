@@ -27,13 +27,13 @@ type BlockchainItertor struct {
 // 使用提供的事务挖掘新块
 func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
-
+	//验证交易是否合法
 	for _, tx := range transactions {
 		if bc.VerifyTransaction(tx) != true {
 			log.Panic("ERROR: Invalid transaction")
 		}
 	}
-
+	//查询 出最后一块交易的id
 	err := bc.Db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BlocksBucket))
 		lastHash = b.Get([]byte("l"))
@@ -46,7 +46,7 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	}
 	//进行挖矿
 	newBlock := NewBlock(transactions, lastHash)
-
+	//写入区块记录
 	err = bc.Db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BlocksBucket))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
