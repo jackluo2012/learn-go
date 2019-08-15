@@ -8,6 +8,10 @@ type TXOutput struct {
 	PubKeyHash []byte
 }
 
+/**
+ * 对TXO进行加锁。
+ * 当发给muo人货币时，仅仅知道他们的地址，因此该方法唯一入参就是地址信息。从地址中从解码出哈希后的公钥，将其保存到PubKeyHash中
+ */
 func (out *TXOutput) Lock(address []byte) {
 	pubKeyHash := Base58Decode(address)
 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]

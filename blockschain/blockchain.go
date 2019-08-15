@@ -27,12 +27,16 @@ type BlockchainItertor struct {
 // 使用提供的事务挖掘新块
 func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
-	//验证交易是否合法
+
+	// 在交易加入到block前进行交易验证
+	// 验证交易是否合法
+
 	for _, tx := range transactions {
 		if bc.VerifyTransaction(tx) != true {
 			log.Panic("ERROR: Invalid transaction")
 		}
 	}
+
 	//查询 出最后一块交易的id
 	err := bc.Db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BlocksBucket))
@@ -192,6 +196,9 @@ func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 	return unspentTXs
 }
 
+/**
+ * SignTransaction 对于一个交易找到其所有引用的交易后，进行签名
+ */
 func (bc *Blockchain) SignTransaction(tx *Transaction, privkey ecdsa.PrivateKey) {
 	prevTXs := make(map[string]Transaction)
 
@@ -200,12 +207,19 @@ func (bc *Blockchain) SignTransaction(tx *Transaction, privkey ecdsa.PrivateKey)
 		if err != nil {
 			log.Panic(err)
 		}
+		//按交易ID做键值对
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
 
 	tx.Sign(privkey, prevTXs)
 }
 
+/**
+ * 现在，需要一个根据交易ID获取交易的函数，
+ * 由于需要访问blockchain,
+ * 因此作为blockchain的一个方法实现:
+ * 根据ID查找并返回交易；
+ */
 func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 	bci := bc.Iterator()
 
@@ -225,7 +239,10 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 
 	return Transaction{}, errors.New("Transaction is not found")
 }
-
+//流程: 1.进行查找交易 ，2.引用交易,进行签名,3.进行验证
+/**
+ * 对于一个交易到其所有引用的交易后,进行验证。
+ */
 func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
 	prevTXs := make(map[string]Transaction)
 

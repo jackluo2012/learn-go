@@ -35,7 +35,7 @@ func (b *Block) HashTransactions() []byte {
 	for _, tx := range b.Transactions {
 		txHashes = append(txHashes, tx.ID)
 	}
-	//将半岛晨报
+	//将字节数组转换成字节
 	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
 
 	return txHash[:]
