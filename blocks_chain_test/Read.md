@@ -42,3 +42,19 @@ go run main.go createblockchain -address 1JeLZ9dn5k5FrkQFWHrk2GvCNbCY9M2VSZ
 go run main.go printchain
 
 ```
+
+#### V12 测试
+```shell
+    //创建钱包
+    go run main.go createWallet
+    // 加入到区块链中
+    go run main.go createblockchain -address 1MiSmJgomsukJ6oPSLeDYgsFvSxcWnmwe1
+    //查询余额
+    go run main.go getbalance -address 1MiSmJgomsukJ6oPSLeDYgsFvSxcWnmwe1
+    // 创建钱包
+    go run main.go createWallet
+    // 转帐
+    go run main.go send -from 1MiSmJgomsukJ6oPSLeDYgsFvSxcWnmwe1 -to 1GmCgeaY7MaMGqCSb9ZQJARPkHGWPV81Pt -amount 4
+    //查询 余额
+    go run main.go getbalance -address 1MiSmJgomsukJ6oPSLeDYgsFvSxcWnmwe1
+```

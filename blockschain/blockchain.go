@@ -25,7 +25,8 @@ type BlockchainItertor struct {
 }
 
 // 使用提供的事务挖掘新块
-func (bc *Blockchain) MineBlock(transactions []*Transaction) {
+func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
+
 	var lastHash []byte
 
 	// 在交易加入到block前进行交易验证
@@ -36,7 +37,6 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 			log.Panic("ERROR: Invalid transaction")
 		}
 	}
-
 	//查询 出最后一块交易的id
 	err := bc.Db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BlocksBucket))
@@ -44,10 +44,10 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 
 		return nil
 	})
-
 	if err != nil {
 		log.Panic(err)
 	}
+
 	//进行挖矿
 	newBlock := NewBlock(transactions, lastHash)
 	//写入区块记录
@@ -68,10 +68,64 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 
 		return nil
 	})
+
 	if err != nil {
 		log.Panic(err)
 	}
+	return newBlock
+}
 
+// FindUTXO finds all unspent transaction outputs and returns transactions with spent outputs removed
+/**
+ * 遍历block 返回所有的UTXO
+ * 和 FIndUnspentTransactions 完全一致
+ * 把回的 是 交易ID和 输出值
+ *
+ */
+func (bc *Blockchain) FindUTXO() map[string]TXOutputs {
+	UTXO := make(map[string]TXOutputs)
+	spentTXOs := make(map[string][]int)
+
+	bci := bc.Iterator()
+
+	for {
+		//迭代处理
+		block := bci.Next()
+		//获取所有的 区块 交易
+		for _, tx := range block.Transactions {
+			txID := hex.EncodeToString(tx.ID)
+
+		Outputs:
+			for outIdx, out := range tx.Vout {
+				// Was the output spent?
+				if spentTXOs[txID] != nil {
+					for _, spentOutIdx := range spentTXOs[txID] {
+						if spentOutIdx == outIdx {
+							//最后一块就跳出吗？
+							continue Outputs
+						}
+					}
+				}
+
+				outs := UTXO[txID]
+				outs.Outputs = append(outs.Outputs, out)
+				UTXO[txID] = outs
+			}
+
+			if tx.IsCoinbase() == false {
+				for _, in := range tx.Vin {
+					inTxID := hex.EncodeToString(in.Txid)
+					spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Vout)
+				}
+			}
+		}
+
+		if len(block.PreBlockHash) == 0 {
+			break
+		}
+	}
+
+	return UTXO
 }
 
 /**
@@ -85,6 +139,7 @@ func (bc *Blockchain) Iterator() *BlockchainItertor {
 	return bci
 }
 
+/*
 // FindUTXO finds and returns all unspent transaction outputs
 func (bc *Blockchain) FindUTXO(pubKeyHash []byte) []TXOutput {
 	var UTXOs []TXOutput
@@ -101,7 +156,7 @@ func (bc *Blockchain) FindUTXO(pubKeyHash []byte) []TXOutput {
 	}
 
 	return UTXOs
-}
+}*/
 
 /**
  *  查找未被消费的交易区块和金额
@@ -135,6 +190,8 @@ Work:
 /**
  * 查找 未消费 TXO(UTXO)
  * 未消费表式TXO 未被任何的 TXI 所引用
+ * 1.遍历所有的block 返回UTXO ,2.通过交易满足要求的可以供消费的交易，3.返回指定公钥hash值的所有UTXO,用于计算yu额
+ * 4.根据
  */
 func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 
@@ -239,11 +296,17 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 
 	return Transaction{}, errors.New("Transaction is not found")
 }
+
 //流程: 1.进行查找交易 ，2.引用交易,进行签名,3.进行验证
 /**
  * 对于一个交易到其所有引用的交易后,进行验证。
  */
 func (bc *Blockchain) VerifyTransaction(tx *Transaction) bool {
+	//挖矿奖励
+	if tx.IsCoinbase() {
+		return true
+	}
+
 	prevTXs := make(map[string]Transaction)
 
 	for _, vin := range tx.Vin {
@@ -281,7 +344,7 @@ func (i *BlockchainItertor) Next() *Block {
 /**
  * 将创世链加入区块链中
  */
-func NewBlockchain(address string) *Blockchain {
+func NewBlockchain() *Blockchain {
 	//检查 文件是否存在,如果 不存,就返回
 	if dbExists() == false {
 		fmt.Println("No existing blockchain found,Create on first")
@@ -332,7 +395,7 @@ func CreateBlockchain(address string) *Blockchain {
 	}
 
 	var tip []byte
-
+	//组织 交易信息
 	cbtx := NewCoinbaseTX(address, GenesisCoinbaseData)
 	//创建创世区块
 	genesis := NewGenesisBlock(cbtx)

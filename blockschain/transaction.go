@@ -198,15 +198,16 @@ func (output TXOutput) CanBeUnlockedWith(address string) bool {
 }
 */
 /**
- * 创建一个新交易
+ * 创建一个创世 新交易 信息
  */
 
 func NewCoinbaseTX(to, data string) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
-
+	//输入为空
 	txin := TXInput{[]byte{}, -1, nil, []byte(data)}
+	//添加输入 进行奖励
 	txout := NewTXOutput(Subsidy, to)
 	tx := Transaction{nil, []TXInput{txin}, []TXOutput{*txout}}
 
@@ -218,7 +219,7 @@ func NewCoinbaseTX(to, data string) *Transaction {
  * 新建一个转账交易
  *
  */
-func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transaction {
+func NewUTXOTransaction(from, to string, amount int, UTXOSet *UTXOSet) *Transaction {
 	var inputs []TXInput
 	var outputs []TXOutput
 
@@ -230,7 +231,7 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transactio
 	wallet := wallets.GetWallet(from)
 	pubKeyHash := HashPubkey(wallet.PublicKey)
 	//查找未被消费的交易区块和金额
-	acc, validOutputs := bc.FindSpendableOutputs(pubKeyHash, amount)
+	acc, validOutputs := UTXOSet.FindSpendableOutputs(pubKeyHash, amount)
 
 	//检查够转账的金额
 	if acc < amount {
@@ -262,7 +263,7 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transactio
 	tx.ID = tx.Hash()
 
 	//进行签名
-	bc.SignTransaction(&tx, wallet.PrivateKey)
+	UTXOSet.Blockchain.SignTransaction(&tx, wallet.PrivateKey)
 
 	return &tx
 }
