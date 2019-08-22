@@ -2,7 +2,6 @@ package blockschain
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/gob"
 	"time"
 )
@@ -26,21 +25,19 @@ func NewBlock(transactions []*Transaction, preBlockHash []byte) *Block {
 	//	block.SetHash()
 	return block
 }
+
 /**
  *  获取 交易信息的 sha265
  */
 func (b *Block) HashTransactions() []byte {
-	var txHashes [][]byte
-	var txHash [32]byte
+	var transactions [][]byte
+
 	for _, tx := range b.Transactions {
-		txHashes = append(txHashes, tx.ID)
+		transactions = append(transactions, tx.Serialize())
 	}
-	//将字节数组转换成字节
-	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
-
-	return txHash[:]
+	mTree := NewMerkleTree(transactions)
+	return mTree.RootNode.Data
 }
-
 
 /**
  * 创世纪链
