@@ -8,7 +8,7 @@ import (
 const (
 	TargetBits          = 24
 	MaxNonce            = math.MaxInt64
-	DbFile              = "blockchians.db"
+	DbFile              = "blockchain_%s.db"
 	BlocksBucket        = "blocks"
 	GenesisCoinbaseData = "创世区块的创立"
 )

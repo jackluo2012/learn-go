@@ -29,6 +29,7 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 
 	var lastHash []byte
 
+	var lastHeight int
 	// 在交易加入到block前进行交易验证
 	// 验证交易是否合法
 
@@ -42,6 +43,11 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 		b := tx.Bucket([]byte(BlocksBucket))
 		lastHash = b.Get([]byte("l"))
 
+		blockData := b.Get(lastHash)
+		block := DeserializeBlock(blockData)
+
+		lastHeight = block.Height
+
 		return nil
 	})
 	if err != nil {
@@ -49,7 +55,7 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 	}
 
 	//进行挖矿
-	newBlock := NewBlock(transactions, lastHash)
+	newBlock := NewBlock(transactions, lastHash, lastHeight+1)
 	//写入区块记录
 	err = bc.Db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(BlocksBucket))
@@ -139,24 +145,24 @@ func (bc *Blockchain) Iterator() *BlockchainItertor {
 	return bci
 }
 
-/*
-// FindUTXO finds and returns all unspent transaction outputs
-func (bc *Blockchain) FindUTXO(pubKeyHash []byte) []TXOutput {
-	var UTXOs []TXOutput
-	//获取 未被交易的 utxo
-	unspentTransactions := bc.FindUnspentTransactions(pubKeyHash)
+// GetBestHeight returns the height of the latest block
+func (bc *Blockchain) GetBestHeight() int {
+	var lastBlock Block
 
-	//未返回的
-	for _, tx := range unspentTransactions {
-		for _, out := range tx.Vout {
-			if out.IsLockedWithKey(pubKeyHash) {
-				UTXOs = append(UTXOs, out)
-			}
-		}
+	err := bc.Db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(BlocksBucket))
+		lastHash := b.Get([]byte("l"))
+		blockData := b.Get(lastHash)
+		lastBlock = *DeserializeBlock(blockData)
+
+		return nil
+	})
+	if err != nil {
+		log.Panic(err)
 	}
 
-	return UTXOs
-}*/
+	return lastBlock.Height
+}
 
 /**
  *  查找未被消费的交易区块和金额
@@ -344,9 +350,10 @@ func (i *BlockchainItertor) Next() *Block {
 /**
  * 将创世链加入区块链中
  */
-func NewBlockchain() *Blockchain {
+func NewBlockchain(nodeID string) *Blockchain {
 	//检查 文件是否存在,如果 不存,就返回
-	if dbExists() == false {
+	dbFile := fmt.Sprintf(DbFile, nodeID)
+	if dbExists(dbFile) == false {
 		fmt.Println("No existing blockchain found,Create on first")
 		os.Exit(1)
 	}
@@ -354,7 +361,7 @@ func NewBlockchain() *Blockchain {
 	var tip []byte
 
 	//打开文件标准
-	db, err := bolt.Open(DbFile, 0600, nil)
+	db, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -377,9 +384,86 @@ func NewBlockchain() *Blockchain {
 	return &bc
 }
 
+// AddBlock saves the block into the blockchain
+func (bc *Blockchain) AddBlock(block *Block) {
+	err := bc.Db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(BlocksBucket))
+		blockInDb := b.Get(block.Hash)
+
+		if blockInDb != nil {
+			return nil
+		}
+
+		blockData := block.Serialize()
+		err := b.Put(block.Hash, blockData)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		lastHash := b.Get([]byte("l"))
+		lastBlockData := b.Get(lastHash)
+		lastBlock := DeserializeBlock(lastBlockData)
+
+		if block.Height > lastBlock.Height {
+			err = b.Put([]byte("l"), block.Hash)
+			if err != nil {
+				log.Panic(err)
+			}
+			bc.Tip = block.Hash
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
+// GetBlock finds a block by its hash and returns it
+func (bc *Blockchain) GetBlock(blockHash []byte) (Block, error) {
+	var block Block
+
+	err := bc.Db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(BlocksBucket))
+
+		blockData := b.Get(blockHash)
+
+		if blockData == nil {
+			return errors.New("Block is not found.")
+		}
+
+		block = *DeserializeBlock(blockData)
+
+		return nil
+	})
+	if err != nil {
+		return block, err
+	}
+
+	return block, nil
+}
+
+// GetBlockHashes returns a list of hashes of all the blocks in the chain
+func (bc *Blockchain) GetBlockHashes() [][]byte {
+	var blocks [][]byte
+	bci := bc.Iterator()
+
+	for {
+		block := bci.Next()
+
+		blocks = append(blocks, block.Hash)
+
+		if len(block.PreBlockHash) == 0 {
+			break
+		}
+	}
+
+	return blocks
+}
+
 //检查区块链文件是否存在
-func dbExists() bool {
-	if _, err := os.Stat(DbFile); os.IsNotExist(err) {
+func dbExists(dbFile string) bool {
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
 		return false
 	}
 	return true
@@ -388,8 +472,9 @@ func dbExists() bool {
 /**
  * 创建一个  区块链 数据库
  */
-func CreateBlockchain(address string) *Blockchain {
-	if dbExists() {
+func CreateBlockchain(address string, nodeID string) *Blockchain {
+	dbFile := fmt.Sprintf(DbFile, nodeID)
+	if dbExists(dbFile) {
 		fmt.Println("Blockchain already exists.")
 		os.Exit(1)
 	}
@@ -400,7 +485,7 @@ func CreateBlockchain(address string) *Blockchain {
 	//创建创世区块
 	genesis := NewGenesisBlock(cbtx)
 
-	db, err := bolt.Open(DbFile, 0600, nil)
+	db, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}

@@ -12,10 +12,11 @@ type Block struct {
 	PreBlockHash []byte         //前一块的 hash
 	Hash         []byte         //当前 hash
 	Nonce        int            //计算出来的值
+	Height       int
 }
 
-func NewBlock(transactions []*Transaction, preBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), transactions, preBlockHash, []byte{}, 0}
+func NewBlock(transactions []*Transaction, preBlockHash []byte, height int) *Block {
+	block := &Block{time.Now().Unix(), transactions, preBlockHash, []byte{}, 0, height}
 	//加入工作证明
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
@@ -44,7 +45,7 @@ func (b *Block) HashTransactions() []byte {
  */
 
 func NewGenesisBlock(coinbas *Transaction) *Block {
-	return NewBlock([]*Transaction{coinbas}, []byte{})
+	return NewBlock([]*Transaction{coinbas}, []byte{},0)
 }
 
 /**

@@ -4,11 +4,11 @@ import (
 	"fmt"
 )
 
-func (cli *CLI) createWallet()  {
-	wallets, _ :=NewWallets()
-	address :=wallets.CresteWallet()
+func (cli *CLI) createWallet(nodeID string) {
+	wallets, _ := NewWallets(nodeID)
+	address := wallets.CresteWallet()
 
-	wallets.SaveToFile()
+	wallets.SaveToFile(nodeID)
 
-	fmt.Printf("You new address: %s\n",address)
+	fmt.Printf("You new address: %s\n", address)
 }

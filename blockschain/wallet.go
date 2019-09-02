@@ -13,7 +13,6 @@ import (
 const (
 	version            = byte(0x00)
 	addressChecksumLen = 4
-	walletFile         = "wallet.dat"
 )
 
 //钱包 是一个密钥对

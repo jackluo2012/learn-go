@@ -115,6 +115,7 @@ func (tx Transaction) String() string {
 	}
 	return strings.Join(lines, "\n")
 }
+
 /**
  * 基于TrimmedCopay交易进行签名
  */
@@ -134,6 +135,7 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	txCopy := Transaction{tx.ID, inputs, outputs}
 	return txCopy
 }
+
 /**
  * 我们使用ECDSA签名算法通过私钥privKey对txCopy.ID进行签名,
  * 生成一对数字序列,生成一对数字序列。
@@ -219,19 +221,13 @@ func NewCoinbaseTX(to, data string) *Transaction {
  * 新建一个转账交易
  *
  */
-func NewUTXOTransaction(from, to string, amount int, UTXOSet *UTXOSet) *Transaction {
+func NewUTXOTransaction(wallet *Wallet, to string, amount int, utxoset *UTXOSet) *Transaction {
 	var inputs []TXInput
 	var outputs []TXOutput
 
-	wallets, err := NewWallets()
-	if err != nil {
-		log.Panic(err)
-	}
-
-	wallet := wallets.GetWallet(from)
 	pubKeyHash := HashPubkey(wallet.PublicKey)
 	//查找未被消费的交易区块和金额
-	acc, validOutputs := UTXOSet.FindSpendableOutputs(pubKeyHash, amount)
+	acc, validOutputs := utxoset.FindSpendableOutputs(pubKeyHash, amount)
 
 	//检查够转账的金额
 	if acc < amount {
@@ -251,6 +247,7 @@ func NewUTXOTransaction(from, to string, amount int, UTXOSet *UTXOSet) *Transact
 		}
 	}
 
+	from := fmt.Sprintf("%s", wallet.GetAddress())
 	// 构建输出列表
 	outputs = append(outputs, *NewTXOutput(amount, to))
 	//如果是 大于,再加入
@@ -263,7 +260,7 @@ func NewUTXOTransaction(from, to string, amount int, UTXOSet *UTXOSet) *Transact
 	tx.ID = tx.Hash()
 
 	//进行签名
-	UTXOSet.Blockchain.SignTransaction(&tx, wallet.PrivateKey)
+	utxoset.Blockchain.SignTransaction(&tx, wallet.PrivateKey)
 
 	return &tx
 }
@@ -291,4 +288,17 @@ func (tx *Transaction) SetID() {
  */
 func (tx *Transaction) IsCoinbase() bool {
 	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
+}
+
+// DeserializeTransaction deserializes a transaction
+func DeserializeTransaction(data []byte) Transaction {
+	var transaction Transaction
+
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&transaction)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return transaction
 }
