@@ -58,3 +58,50 @@ go run main.go printchain
     //查询 余额
     go run main.go getbalance -address 1MiSmJgomsukJ6oPSLeDYgsFvSxcWnmwe1
 ```
+
+### 场景
+- 1.中心节点创建blockchain
+- 2.其他钱包节点连接到中心节点，并下载blockchain
+- 3.一个或多个矿工节点连接到中心节点,并下载blockchain
+- 4.钱包节点创建一个交易
+- 5.矿工节点收到此交易并保存在mempool中
+- 6.当mempool有足够交易时，矿工开始挖矿
+- 7.当新的block生成时,其将被发送到中心节点
+- 8.钱包节点与中心节点进行同步
+- 9.钱包节点的拥有者将检查支付是否成功
+
+### version 消息
+
+
+### 场景进行演练
+```shell
+// 设置终端 端口
+export NODE_ID=3000
+
+go run main.go createWallet
+
+go run main.go createblockchain -address 1zhpLAhUbQ7MTJ72iyfoVLh62BnYn3Njz
+
+1JUXiiCPZsdcJLVWp6fpCwgi8bXPJLT5HK
+
+124Qioe4NHSbzJHVZFTD3NFPMKCFC2dXAE
+
+1DQcuNCCRBDfwxH3MDkoGyrjNkUbhKEXSS
+
+go run main.go send -from 1zhpLAhUbQ7MTJ72iyfoVLh62BnYn3Njz -to 1JUXiiCPZsdcJLVWp6fpCwgi8bXPJLT5HK -amount 10 -mine
+
+go run main.go send -from 1zhpLAhUbQ7MTJ72iyfoVLh62BnYn3Njz -to 124Qioe4NHSbzJHVZFTD3NFPMKCFC2dXAE -amount 10 -mine
+
+
+go run main.go getbalance -address 1zhpLAhUbQ7MTJ72iyfoVLh62BnYn3Njz
+go run main.go getbalance -address 1JUXiiCPZsdcJLVWp6fpCwgi8bXPJLT5HK
+go run main.go getbalance -address 124Qioe4NHSbzJHVZFTD3NFPMKCFC2dXAE
+
+
+go run main.go send -from 1JUXiiCPZsdcJLVWp6fpCwgi8bXPJLT5HK -to 124Qioe4NHSbzJHVZFTD3NFPMKCFC2dXAE -amount 1
+
+go run main.go send -from 124Qioe4NHSbzJHVZFTD3NFPMKCFC2dXAE -to 1JUXiiCPZsdcJLVWp6fpCwgi8bXPJLT5HK -amount 1
+
+
+
+```
